@@ -11,7 +11,6 @@ import { LevelUI } from "./ui/LevelUI";
   await app.init({ resizeTo: window, backgroundColor: 0x000000 });
   document.getElementById("pixi-container")!.appendChild(app.canvas);
 
-  // ✅ Гарантированная загрузка. Никаких null!
   const [bgTexture, arrowTextures, winAssets, uiMoneyTexture, changeTexture] = await Promise.all([
     loadBackground(app),
     loadArrowTextures(app),
@@ -20,7 +19,7 @@ import { LevelUI } from "./ui/LevelUI";
       const g = new Graphics().beginFill(0x3399ff).drawRoundedRect(0, 0, 120, 50, 25).endFill();
       return app.renderer.generateTexture(g);
     }),
-    loadChangeButtonTexture(app) // ← Функция уже содержит fallback
+    loadChangeButtonTexture(app)
   ]);
 
   const bgSprite = new Sprite(bgTexture);
@@ -30,21 +29,19 @@ import { LevelUI } from "./ui/LevelUI";
   const levelUI = new LevelUI(1);
   const scoreUI = new ScoreUI(uiMoneyTexture);
   const winScreen = new WinScreen(app, winAssets.winTexture, winAssets.closeTexture, winAssets.starTexture);
-
-
   const changeButton = new ChangeButtonUI(changeTexture, 3, () => {
-  if (game) game.activateChangeMode();
-}, -83, 40); // x=0, y=-10 (над кнопкой)
+    if (game) game.activateChangeMode();
+  }, -83, 40);
 
   const game = new GameApp(app, arrowTextures, changeButton, (points) => scoreUI.addPoints(points), () => {
     winScreen.show(() => {});
   });
 
-  // 🔝 UI добавляем ПОСЛЕ игры → они будут СВЕРХУ (Z-Order)
-  app.stage.addChild(winScreen);
-  app.stage.addChild(changeButton);
+  // 🔝 Z-Order: WinScreen последним → всегда поверх
   app.stage.addChild(scoreUI);
   app.stage.addChild(levelUI);
+  app.stage.addChild(changeButton);
+  app.stage.addChild(winScreen);
 
   const resizeHandler = () => {
     const width = window.innerWidth;
@@ -56,23 +53,45 @@ import { LevelUI } from "./ui/LevelUI";
 
     const gameWidth = game.gridManager.gameWidth;
     const gameHeight = game.gridManager.gameHeight;
-    const padding = isLandscape ? 20 : 40;
-    const scaleX = (width - padding) / gameWidth;
-    const scaleY = (height - padding) / gameHeight;
-    const gameScale = Math.min(scaleX, scaleY, 1.2);
+
+    // 🔽 УМЕНЬШЕНИЕ ПОЛЯ В ЛАНДШАФТЕ: увеличиваем вертикальный отступ,
+    // чтобы сетка стала компактнее по высоте и освободилось место для текста "Уровень"
+    const horizontalPadding = isLandscape ? 40 : 60;
+    const verticalPadding = isLandscape ? 120 : 60; // 👈 Дополнительный запас для LevelUI
+
+    const scaleX = (width - horizontalPadding) / gameWidth;
+    const scaleY = (height - verticalPadding) / gameHeight;
+    const gameScale = Math.min(scaleX, scaleY, 1.0);
     game.resize(width, height, gameScale);
 
-    const gameBottom = (height / 2) + (gameHeight * gameScale) / 2;
+    // Границы игрового поля
+    const gridCenterX = width / 2;
+    const gridCenterY = height / 2;
+    const gridRight = gridCenterX + (gameWidth * gameScale) / 2;
+    const gridBottom = gridCenterY + (gameHeight * gameScale) / 2;
+    const gridTop = gridCenterY - (gameHeight * gameScale) / 2;
 
+    levelUI.position.set(gridCenterX, gridTop - 30);
+    scoreUI.position.set(20, 20);
 
-    const topOffset = isLandscape ? 40 : 60; // Чуть ниже прежнего
-    levelUI.position.set(width / 2, topOffset);
-    scoreUI.position.set(topOffset, topOffset);
+    // 🔘 ОТСТУПЫ (сохранены без изменений)
+    const marginPortraitBottom = 120;
+    const marginLandscapeRight  = 180;
 
-    // Кнопка: под полем, но не уходит за низ экрана
-    let buttonY = gameBottom + 100;
-    buttonY = Math.min(buttonY, height - 40);
-    changeButton.position.set(width / 2, buttonY);
+    // 🔍 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: порог увеличен до 1100px, чтобы охватывать телефоны с шириной 915-1080px
+    const isMobileRotate = isLandscape && width < 1100;
+
+    if (isMobileRotate) {
+      // 📱 Rotate (мобильные): справа от поля, по вертикальному центру
+      let btnX = gridRight + marginLandscapeRight;
+      btnX = Math.min(btnX, width - 60); // Защита от выхода за правый край
+      changeButton.position.set(btnX, gridCenterY);
+    } else {
+      // 🖥️ Desktop / Portrait: снизу по центру
+      let btnY = gridBottom + marginPortraitBottom;
+      btnY = Math.min(btnY, height - 60); // Защита от выхода за нижний край
+      changeButton.position.set(gridCenterX, btnY);
+    }
 
     winScreen.resize();
   };

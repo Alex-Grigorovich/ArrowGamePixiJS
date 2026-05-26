@@ -4,17 +4,16 @@ export class LevelUI extends Container {
   private levelText: Text;
   private currentLevel: number;
 
-  constructor(level: number) {
+  constructor(level: number = 1) {
     super();
     this.currentLevel = level;
     this.levelText = new Text({
-      text: `Level ${level}`,
+      text: `Уровень: ${level}`,
       style: {
         fontFamily: 'Arial',
         fontSize: 24,
         fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 2,
+        stroke: { color: 0x000000, width: 2 }, // ✅ v8 синтаксис
         fontWeight: 'bold'
       }
     });
@@ -22,8 +21,8 @@ export class LevelUI extends Container {
     this.addChild(this.levelText);
   }
 
-  public setLevel(level: number) {
+  public setLevel(level: number): void {
     this.currentLevel = level;
-    this.levelText.text = `Level ${level}`;
+    this.levelText.text = `Уровень: ${level}`;
   }
 }

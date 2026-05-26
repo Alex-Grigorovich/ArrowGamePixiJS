@@ -38,7 +38,6 @@ export class ChangeButtonUI extends Container {
     });
     this.addChild(this.buttonInteractive);
 
-    // 👇 PixiJS v8 синтаксис + чёрный цвет без обводки
     this.countText = new Text({
       text: `${this.remainingUses}`,
       style: {

@@ -16,8 +16,7 @@ export class ScoreUI extends Container {
         fontFamily: 'Arial',
         fontSize: 28,
         fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 3,
+        stroke: { color: 0x000000, width: 3 }, // ✅ v8 синтаксис
         fontWeight: 'bold'
       }
     });
@@ -26,12 +25,12 @@ export class ScoreUI extends Container {
     bg.addChild(this.scoreText);
   }
 
-  public addPoints(points: number) {
+  public addPoints(points: number): void {
     this.currentScore += points;
     this.scoreText.text = `${this.currentScore}`;
   }
 
-  public reset() {
+  public reset(): void {
     this.currentScore = 0;
     this.scoreText.text = "0";
   }
