@@ -7,15 +7,11 @@ export interface TextureSet {
 }
 
 export async function loadArrowTextures(app: Application): Promise<{
-  std: TextureSet;
-  orange: TextureSet;
-  blue: TextureSet;
-  green: TextureSet;
+  std: TextureSet; orange: TextureSet; blue: TextureSet; green: TextureSet;
 }> {
   const loadSet = async (names: Record<Direction, string>, boldNames: Record<Direction, string>) => {
     const normal: Record<Direction, Texture> = {} as any;
     const bold: Record<Direction, Texture> = {} as any;
-
     for (const dir of Object.keys(names) as Direction[]) {
       try { normal[dir] = await Assets.load(names[dir]); } catch {
         const g = new Graphics(); g.beginFill(0x888888).drawCircle(0, 0, 10).endFill();
@@ -26,7 +22,7 @@ export async function loadArrowTextures(app: Application): Promise<{
     return { normal, bold };
   };
 
-  // 👇 Пробелы в конце путей удалены!
+  // 👇 Пути без лишних пробелов
   const [std, orange, blue, green] = await Promise.all([
     loadSet({ up: "/assets/ArrowUp.png", down: "/assets/ArrowDown.png", left: "/assets/arrowLeft.png", right: "/assets/ArrowRight.png" },
       { up: "/assets/ArrowUp_Bold.png", down: "/assets/ArrowDown_Bold.png", left: "/assets/ArrowLeft_Bold.png", right: "/assets/ArrowRight_Bold.png" }),
@@ -54,6 +50,7 @@ export async function loadWinAssets(app: Application) {
   return { winTexture, closeTexture, starTexture };
 }
 
+// Вспомогательная функция для безопасной загрузки
 async function loadDefault(app: Application, url: string, fb: () => Texture) {
   try { return await Assets.load(url); } catch { return fb(); }
 }
@@ -63,4 +60,34 @@ export async function loadChangeButtonTexture(app: Application): Promise<Texture
     const g = new Graphics(); g.beginFill(0x44aa44).drawRoundedRect(0,0,100,50,10).endFill();
     return app.renderer.generateTexture(g);
   }
+}
+
+// 🔹 Функция загрузки жизней (Только один раз!)
+export async function loadLivesTextures(app: Application) {
+  const life = await loadDefault(app, "/assets/Life.png", () => {
+    const g = new Graphics(); g.beginFill(0xff4444).drawCircle(0,0,15).endFill();
+    return app.renderer.generateTexture(g);
+  });
+  const blank = await loadDefault(app, "/assets/Life_Blank.png", () => {
+    const g = new Graphics(); g.beginFill(0x888888).drawCircle(0,0,15).endFill();
+    return app.renderer.generateTexture(g);
+  });
+  return { life, blank };
+}
+
+// 🔹 Экран проигрыша
+export async function loadGameOverTextures(app: Application) {
+  const lose = await loadDefault(app, "/assets/Lose.png", () => {
+    const g = new Graphics(); g.beginFill(0x333333).drawRoundedRect(0,0,400,300,20).endFill();
+    return app.renderer.generateTexture(g);
+  });
+  const repeat = await loadDefault(app, "/assets/Lose_repeat.png", () => {
+    const g = new Graphics(); g.beginFill(0x44aa44).drawRoundedRect(0,0,160,50,10).endFill();
+    return app.renderer.generateTexture(g);
+  });
+  const exit = await loadDefault(app, "/assets/Lose_exit.png", () => {
+    const g = new Graphics(); g.beginFill(0xaa4444).drawRoundedRect(0,0,160,50,10).endFill();
+    return app.renderer.generateTexture(g);
+  });
+  return { lose, repeat, exit };
 }

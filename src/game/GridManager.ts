@@ -12,42 +12,39 @@ export class GridManager {
     this.gameHeight = this.gridSize * (this.tileSize + this.spacing) - this.spacing;
   }
 
-  public generateRandomConfig(originalConfig: { direction: Direction; color: string }[][]): CellConfig[] {
-    const cells: CellConfig[] = [];
-    for (let row = 0; row < this.gridSize; row++) {
-      for (let col = 0; col < this.gridSize; col++) {
-        cells.push({
-          row, col,
-          direction: originalConfig[row][col].direction,
-          originalColor: originalConfig[row][col].color,
-        });
-      }
-    }
-    // перемешиваем клетки
+  // 👇 Теперь принимает массив активных ячеек (фигуру) и базовую конфигурацию
+  public generateRandomConfig(
+    activeCells: { row: number; col: number }[],
+    originalConfig: { direction: Direction; color: string }[][]
+  ): CellConfig[] {
+    const cells: CellConfig[] = activeCells.map((c) => ({ ...c }));
+
+    // Перемешиваем клетки
     for (let i = cells.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [cells[i], cells[j]] = [cells[j], cells[i]];
     }
 
-    // распределяем цвета
-    const colorPool = this.buildColorPool();
+    // Распределяем цвета и направления
+    const colorPool = this.buildColorPool(cells.length);
     for (let i = 0; i < cells.length; i++) {
       cells[i].color = colorPool[i];
+      cells[i].direction = originalConfig[cells[i].row][cells[i].col].direction;
     }
+
     return cells;
   }
 
-  private buildColorPool(): string[] {
-    const colorCounts = { standard: 4, orange: 4, blue: 4, green: 4 };
+  private buildColorPool(count: number): string[] {
+    const colors = ["standard", "orange", "blue", "green"];
     const pool: string[] = [];
-    for (const [color, count] of Object.entries(colorCounts)) {
-      for (let i = 0; i < count; i++) pool.push(color);
-    }
+    while (pool.length < count) pool.push(...colors);
+    // Перемешиваем
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return pool;
+    return pool.slice(0, count);
   }
 
   public getCellPosition(row: number, col: number): { x: number; y: number } {
@@ -55,7 +52,7 @@ export class GridManager {
     const startY = -this.gameHeight / 2 + this.tileSize / 2;
     return {
       x: startX + col * (this.tileSize + this.spacing),
-      y: startY + row * (this.tileSize + this.spacing)
+      y: startY + row * (this.tileSize + this.spacing),
     };
   }
 

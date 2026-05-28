@@ -4,33 +4,73 @@ import { GridManager } from "./GridManager";
 import type { Direction, CellConfig } from "../types/types";
 import type { TextureSet } from "../assets/loadAssets";
 import { ChangeButtonUI } from "../ui/ChangeButtonUI";
+import { LivesUI } from "../ui/LivesUI";
+
+// 📐 Массив фигур (координаты активных ячеек)
+const SHAPES: { row: number; col: number }[][] = [
+  // 0: Квадрат (16)
+  Array.from({ length: 4 }, (_, r) => Array.from({ length: 4 }, (_, c) => ({ row: r, col: c }))).flat(),
+  // 1: Прямоугольник (12)
+  Array.from({ length: 3 }, (_, r) => Array.from({ length: 4 }, (_, c) => ({ row: r, col: c }))).flat(),
+  // 2: Треугольник (10)
+  [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }],
+  // 3: Ромб (8)
+  [{ row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 }, { row: 3, col: 2 }],
+  // 4: Параллелограмм (8)
+  [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 2, col: 2 }, { row: 2, col: 3 }, { row: 3, col: 2 }, { row: 3, col: 3 }],
+  // 5: Трапеция (11)
+  [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 1, col: 3 }, { row: 2, col: 0 }, { row: 2, col: 3 }, { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }],
+  // 6: Пятиугольник (9)
+  [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 1, col: 2 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 3, col: 1 }],
+  // 7: Шестиугольник (10)
+  [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 1, col: 2 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 3, col: 1 }, { row: 3, col: 2 }]
+];
+
+// Базовая конфигурация 4x4 (цвета и направления для генерации)
+const ORIGINAL_CONFIG = [
+  [{ direction: "left" as Direction, color: "green" }, { direction: "down", color: "green" }, { direction: "right", color: "red" }, { direction: "up", color: "red" }],
+  [{ direction: "left", color: "red" }, { direction: "down", color: "red" }, { direction: "down", color: "red" }, { direction: "up", color: "red" }],
+  [{ direction: "up", color: "purple" }, { direction: "right", color: "purple" }, { direction: "down", color: "purple" }, { direction: "up", color: "purple" }],
+  [{ direction: "right", color: "purple" }, { direction: "down", color: "purple" }, { direction: "right", color: "purple" }, { direction: "up", color: "purple" }]
+];
 
 export class GameApp {
-  public gridManager: GridManager; // сделано публичным для доступа из main
+  public gridManager: GridManager;
+  public currentLevel = 1;
+  public livesUI: LivesUI; // 👈 Сделали публичным, чтобы main мог читать жизни если нужно
+  
   private app: PIXI.Application;
   private arrowsContainer: PIXI.Container;
   private dotsContainer: PIXI.Container;
   private arrows: Arrow[] = [];
+  
+  // 👈 Обновленный тип: теперь принимает рейтинг (число)
+  private onWin: (rating: number) => void;
   private onScoreUpdate: (score: number) => void;
-  private onWin: () => void;
-
+  private onGameOver: () => void;
+  
   private changeButton: ChangeButtonUI;
   private isChangeModeActive = false;
   private textureSets: { std: TextureSet; orange: TextureSet; blue: TextureSet; green: TextureSet };
+  private lastShapeIndex = -1;
 
   constructor(
     app: PIXI.Application,
     textureSets: { std: TextureSet; orange: TextureSet; blue: TextureSet; green: TextureSet },
     changeButton: ChangeButtonUI,
+    livesUI: LivesUI,
     onScoreUpdate: (score: number) => void,
-    onWin: () => void
+    onWin: (rating: number) => void, // 👈 Новый тип
+    onGameOver: () => void
   ) {
     this.app = app;
     this.gridManager = new GridManager();
     this.textureSets = textureSets;
     this.changeButton = changeButton;
+    this.livesUI = livesUI;
     this.onScoreUpdate = onScoreUpdate;
     this.onWin = onWin;
+    this.onGameOver = onGameOver;
 
     this.arrowsContainer = new PIXI.Container();
     this.dotsContainer = new PIXI.Container();
@@ -42,15 +82,19 @@ export class GameApp {
     this.initGame();
   }
 
-  private initGame() {
-    const originalConfig = this.getOriginalConfig();
-    let cells = this.gridManager.generateRandomConfig(originalConfig);
-    // Добавляем 1-2 пары противоположных стрелок
-    cells = this.injectOppositeArrows(cells);
+  private pickShape() {
+    let idx: number;
+    do {
+      idx = Math.floor(Math.random() * SHAPES.length);
+    } while (idx === this.lastShapeIndex && SHAPES.length > 1);
+    this.lastShapeIndex = idx;
+    return SHAPES[idx];
+  }
 
-    const directionsDelta = {
-      up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
-    };
+  private initGame() {
+    const activeCells = this.pickShape();
+    let cells = this.gridManager.generateRandomConfig(activeCells, ORIGINAL_CONFIG);
+    cells = this.injectOppositeArrows(cells);
 
     for (const cell of cells) {
       const { row, col, direction, color } = cell;
@@ -63,27 +107,25 @@ export class GameApp {
       const arrow = new Arrow(normalTex, boldTex, direction, color!, row, col, pos.x, pos.y, baseWidth);
       this.arrows.push(arrow);
       this.arrowsContainer.addChild(arrow);
-
-      // Обработчик клика – единая точка входа
       arrow.on("pointerdown", () => this.handleArrowClick(arrow));
     }
   }
 
   private handleArrowClick(arrow: Arrow) {
     if (arrow.isFlying) return;
-
     if (this.isChangeModeActive) {
-      // Режим смены направления
       this.changeArrowDirection(arrow);
       this.isChangeModeActive = false;
-      // Сбросить курсор (опционально)
       this.app.stage.eventMode = "auto";
       return;
     }
 
-    // Обычный режим: полёт
     if (this.hasObstacle(arrow.row, arrow.col, arrow.direction)) {
       this.shakeArrow(arrow);
+      const allLost = this.livesUI.loseLife();
+      if (allLost) {
+        setTimeout(() => this.onGameOver(), 300);
+      }
       return;
     }
 
@@ -94,35 +136,23 @@ export class GameApp {
       this.arrowsContainer.removeChild(arrow);
       const idx = this.arrows.indexOf(arrow);
       if (idx !== -1) this.arrows.splice(idx, 1);
+      
       if (this.arrows.length === 0) {
-        setTimeout(() => this.onWin(), 100);
+        // 👈 Рассчитываем рейтинг на основе оставшихся жизней
+        const rating = this.livesUI.getRemainingLives(); 
+        setTimeout(() => this.onWin(rating), 100);
       }
     });
   }
 
   private changeArrowDirection(arrow: Arrow) {
-  // Противоположные направления
-  const opposite: Record<Direction, Direction> = {
-    up: "down",
-    down: "up",
-    left: "right",
-    right: "left"
-  };
-  const newDirection = opposite[arrow.direction];
-
-  // Получаем текстуры для нового направления (из того же цветового набора)
-  const texSet = this.getTextureSet(arrow.color);
-  const newNormal = texSet.normal[newDirection];
-  const newBold = texSet.bold[newDirection];
-
-  arrow.setDirection(newDirection, newNormal, newBold);
-
-  // Уменьшаем счётчик использований
-  this.changeButton.useOne();
-
-  // Визуальный отклик
-  this.blinkArrow(arrow);
-}
+    const opposite: Record<Direction, Direction> = { up: "down", down: "up", left: "right", right: "left" };
+    const newDirection = opposite[arrow.direction];
+    const texSet = this.getTextureSet(arrow.color);
+    arrow.setDirection(newDirection, texSet.normal[newDirection], texSet.bold[newDirection]);
+    this.changeButton.useOne();
+    this.blinkArrow(arrow);
+  }
 
   private blinkArrow(arrow: Arrow) {
     const originalAlpha = arrow.alpha;
@@ -130,25 +160,16 @@ export class GameApp {
     const interval = setInterval(() => {
       arrow.alpha = arrow.alpha === 1 ? 0.5 : 1;
       count++;
-      if (count >= 4) {
-        clearInterval(interval);
-        arrow.alpha = originalAlpha;
-      }
+      if (count >= 4) { clearInterval(interval); arrow.alpha = originalAlpha; }
     }, 100);
   }
 
   public activateChangeMode() {
     if (this.changeButton.getRemainingUses() > 0) {
       this.isChangeModeActive = true;
-      // Визуальный фидбек: изменить курсор на всей сцене
       this.app.stage.eventMode = "static";
       this.app.stage.cursor = "cell";
-      // Можно добавить подсветку всех стрелок
-      this.arrows.forEach(arrow => {
-        arrow.cursor = "pointer";
-        // например, добавить обводку
-      });
-      // Через 5 секунд автоматически деактивировать, если не выбрана стрелка
+      this.arrows.forEach(a => { a.cursor = "pointer"; });
       setTimeout(() => {
         if (this.isChangeModeActive) {
           this.isChangeModeActive = false;
@@ -160,42 +181,20 @@ export class GameApp {
   }
 
   private injectOppositeArrows(cells: CellConfig[]): CellConfig[] {
-    const oppositePairs: [Direction, Direction][] = [
-      ["left", "right"],
-      ["right", "left"],
-      ["up", "down"],
-      ["down", "up"]
-    ];
-    // Выбираем случайное количество пар (1 или 2)
-    const numPairs = Math.random() < 0.5 ? 1 : 2;
-    // Создаём копию массива клеток, чтобы не повредить оригинал
-    let newCells = [...cells];
-    let attempts = 0;
-    let pairsAdded = 0;
-
-    while (pairsAdded < numPairs && attempts < 50) {
-      // Выбираем две соседние клетки (по горизонтали или вертикали)
+    const newCells = [...cells];
+    let attempts = 0, pairsAdded = 0;
+    while (pairsAdded < (Math.random() < 0.5 ? 1 : 2) && attempts < 50) {
       const randIdx = Math.floor(Math.random() * newCells.length);
       const cellA = newCells[randIdx];
-      // Ищем соседа справа или снизу
       let neighbor: CellConfig | null = null;
       if (cellA.col + 1 < this.gridManager.gridSize) {
         neighbor = newCells.find(c => c.row === cellA.row && c.col === cellA.col + 1);
-        if (neighbor) {
-          // Устанавливаем направления: левая стрелка вправо, правая влево
-          cellA.direction = "right";
-          neighbor.direction = "left";
-        }
+        if (neighbor) { cellA.direction = "right"; neighbor.direction = "left"; }
       } else if (cellA.row + 1 < this.gridManager.gridSize) {
         neighbor = newCells.find(c => c.row === cellA.row + 1 && c.col === cellA.col);
-        if (neighbor) {
-          cellA.direction = "down";
-          neighbor.direction = "up";
-        }
+        if (neighbor) { cellA.direction = "down"; neighbor.direction = "up"; }
       }
-      if (neighbor) {
-        pairsAdded++;
-      }
+      if (neighbor) pairsAdded++;
       attempts++;
     }
     return newCells;
@@ -203,12 +202,10 @@ export class GameApp {
 
   private hasObstacle(startRow: number, startCol: number, dir: Direction): boolean {
     const delta = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[dir];
-    let r = startRow + delta.y;
-    let c = startCol + delta.x;
+    let r = startRow + delta.y, c = startCol + delta.x;
     while (r >= 0 && r < this.gridManager.gridSize && c >= 0 && c < this.gridManager.gridSize) {
       if (this.arrows.some(a => a.row === r && a.col === c && !a.isFlying)) return true;
-      r += delta.y;
-      c += delta.x;
+      r += delta.y; c += delta.x;
     }
     return false;
   }
@@ -218,13 +215,8 @@ export class GameApp {
     const steps = [5, -5, 5, -5];
     let i = 0;
     const interval = setInterval(() => {
-      if (i >= steps.length) {
-        arrow.x = origX;
-        clearInterval(interval);
-        return;
-      }
-      arrow.x = origX + steps[i];
-      i++;
+      if (i >= steps.length) { arrow.x = origX; clearInterval(interval); return; }
+      arrow.x = origX + steps[i++];
     }, 50);
   }
 
@@ -245,15 +237,6 @@ export class GameApp {
     return this.textureSets.std;
   }
 
-  private getOriginalConfig() {
-    return [
-      [{ direction: "left" as Direction, color: "green" }, { direction: "down", color: "green" }, { direction: "right", color: "red" }, { direction: "up", color: "red" }],
-      [{ direction: "left", color: "red" }, { direction: "down", color: "red" }, { direction: "down", color: "red" }, { direction: "up", color: "red" }],
-      [{ direction: "up", color: "purple" }, { direction: "right", color: "purple" }, { direction: "down", color: "purple" }, { direction: "up", color: "purple" }],
-      [{ direction: "right", color: "purple" }, { direction: "down", color: "purple" }, { direction: "right", color: "purple" }, { direction: "up", color: "purple" }]
-    ];
-  }
-
   public resize(width: number, height: number, gameScale: number) {
     this.arrowsContainer.scale.set(gameScale);
     this.dotsContainer.scale.set(gameScale);
@@ -261,14 +244,25 @@ export class GameApp {
     this.dotsContainer.position.set(width / 2, height / 2);
   }
 
-  // Добавить, если нужно сбросить игру (опционально)
-  public reset() {
-    // очистка контейнеров
+  public resetLevel() {
+    this.currentLevel = 1;
     this.arrowsContainer.removeChildren();
     this.dotsContainer.removeChildren();
     this.arrows = [];
     this.isChangeModeActive = false;
     this.changeButton.reset();
+    this.livesUI.reset();
+    this.initGame();
+  }
+
+  public nextLevel() {
+    this.currentLevel++;
+    this.arrowsContainer.removeChildren();
+    this.dotsContainer.removeChildren();
+    this.arrows = [];
+    this.isChangeModeActive = false;
+    this.changeButton.reset();
+    this.livesUI.reset();
     this.initGame();
   }
 }

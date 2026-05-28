@@ -14,14 +14,14 @@ export class WinScreen extends Container {
     this.winTexture = winTexture;
     this.closeTexture = closeTexture;
     this.starTexture = starTexture;
-    this.visible = false; // изначально скрыт
+    this.visible = false;
   }
 
-  public show(onClose: () => void) {
+  public show(rating: number, onClose: () => void) {
     this.visible = true;
-    this.removeChildren(); // очищаем
+    this.removeChildren();
 
-    // Затемнение
+    // 1. Затемнение фона
     this.dimBg = new Graphics();
     this.dimBg.beginFill(0x000000, 0.7);
     this.dimBg.drawRect(0, 0, this.app.screen.width, this.app.screen.height);
@@ -29,43 +29,65 @@ export class WinScreen extends Container {
     this.dimBg.eventMode = "static";
     this.addChild(this.dimBg);
 
-    // Главный спрайт победы
+    // 2. Главный спрайт (панель победы)
     this.winSprite = new Sprite(this.winTexture);
     this.winSprite.anchor.set(0.5);
     this.winSprite.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
     this.addChild(this.winSprite);
 
-    // Звёзды
+    // 3. 🔽 НАСТРОЙКИ ЗВЁЗД (Значения сохранены согласно вашим настройкам)
     const starY = 70;
-    const starX = [-270, 0, 285];
-    const targetStarWidth = 270;
-    for (let i = 0; i < 3; i++) {
+    const starSpacing = 280; // Расстояние между слотами
+    const firstStarOffset = 10;  // Отступ 1-й звезды
+    const thirdStarOffset = 5;   // Отступ 3-й звезды
+    
+    // Масштаб звёзд
+    const starScale = Math.min(2.5, 270 / this.starTexture.width);
+
+    for (let i = 0; i < rating; i++) {
       const star = new Sprite(this.starTexture);
       star.anchor.set(0.5);
-      star.position.set(starX[i], starY);
-      const scale = targetStarWidth / this.starTexture.width;
-      star.scale.set(scale);
-      if (i >= 3) star.alpha = 0.3;
+      
+      // Базовая позиция слотов
+      let xPos = -starSpacing + (i * starSpacing);
+      
+      // Применяем ваши отступы
+      if (i === 0) {
+        xPos += firstStarOffset;
+      }
+      if (i === 2) {
+        xPos += thirdStarOffset;
+      }
+      
+      star.position.set(xPos, starY);
+      star.scale.set(starScale);
       this.winSprite.addChild(star);
     }
 
-    // Кнопка закрытия
+    // 4. Кнопка закрытия (Справа и Вверху)
     const closeBtn = new Sprite(this.closeTexture);
     closeBtn.anchor.set(0.5);
-    closeBtn.position.set(this.winSprite.width / 2 - 160, -this.winSprite.height / 2 + 190);
+
+    // 📍 НАСТРОЙКА ПОЗИЦИИ КНОПКИ:
+    // Используем размеры текстуры панели для расчёта координат относительно центра (0,0)
+    const closeBtnX = (this.winTexture.width / 2) - 160;  // 👈 60px от правого края (увеличьте, чтобы сдвинуть левее)
+    const closeBtnY = (-this.winTexture.height / 2) + 180; // 👈 40px от верхнего края (уменьшите, чтобы сдвинуть выше)
+    
+    closeBtn.position.set(closeBtnX, closeBtnY);
     closeBtn.eventMode = "static";
     closeBtn.cursor = "pointer";
+    
     closeBtn.on("pointerdown", () => {
       this.hide();
       onClose();
     });
     this.winSprite.addChild(closeBtn);
 
-    // Анимация появления
+    // 5. Анимация появления
     const targetScale = Math.min(
       this.app.screen.width * 0.8 / this.winTexture.width,
       this.app.screen.height * 0.8 / this.winTexture.height,
-      1.5
+      1.2
     );
     this.winSprite.scale.set(0);
     this.animateScale(this.winSprite, targetScale);

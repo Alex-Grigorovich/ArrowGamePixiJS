@@ -13,7 +13,7 @@ export class LevelUI extends Container {
         fontFamily: 'Arial',
         fontSize: 24,
         fill: 0xffffff,
-        stroke: { color: 0x000000, width: 2 }, // ✅ v8 синтаксис
+        stroke: { color: 0x000000, width: 2 },
         fontWeight: 'bold'
       }
     });
