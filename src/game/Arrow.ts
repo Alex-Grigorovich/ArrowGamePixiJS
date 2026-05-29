@@ -8,7 +8,7 @@ export class Arrow extends Sprite {
   public col: number;
   public isFlying = false;
 
-  private normalTex: Sprite["texture"];  // Texture
+  private normalTex: Sprite["texture"];
   private boldTex: Sprite["texture"];
   private baseScaleNormal: number;
   private baseScaleBold: number;
@@ -65,31 +65,32 @@ export class Arrow extends Sprite {
     this.direction = newDirection;
     this.normalTex = newNormalTex;
     this.boldTex = newBoldTex;
-
-    // Обновляем текстуру, если не в полёте
     if (!this.isFlying) {
       this.texture = this.normalTex;
       this.scale.set(this.baseScaleNormal);
     }
   }
 
-  public fly(delta: { x: number; y: number }, onComplete: () => void) {
+  // 🔽 Метод принимает дистанцию полёта
+  public fly(delta: { x: number; y: number }, distance: number, onComplete: () => void) {
     this.isFlying = true;
     this.texture = this.boldTex;
     this.scale.set(this.baseScaleBold);
+
     const startX = this.x;
     const startY = this.y;
     const startTime = performance.now();
-    const duration = 500;
-    const distance = 300;
+    const duration = 400;
 
     const animate = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const ease = 1 - Math.pow(1 - progress, 3);
+
       this.x = startX + delta.x * distance * ease;
       this.y = startY + delta.y * distance * ease;
       this.alpha = 1 - progress * 0.5;
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {

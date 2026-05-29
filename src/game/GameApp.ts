@@ -5,28 +5,19 @@ import type { Direction, CellConfig } from "../types/types";
 import type { TextureSet } from "../assets/loadAssets";
 import { ChangeButtonUI } from "../ui/ChangeButtonUI";
 import { LivesUI } from "../ui/LivesUI";
+import { ParticleSystem } from "./ParticleSystem";
 
-// 📐 Массив фигур (координаты активных ячеек)
 const SHAPES: { row: number; col: number }[][] = [
-  // 0: Квадрат (16)
   Array.from({ length: 4 }, (_, r) => Array.from({ length: 4 }, (_, c) => ({ row: r, col: c }))).flat(),
-  // 1: Прямоугольник (12)
   Array.from({ length: 3 }, (_, r) => Array.from({ length: 4 }, (_, c) => ({ row: r, col: c }))).flat(),
-  // 2: Треугольник (10)
   [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }],
-  // 3: Ромб (8)
   [{ row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 }, { row: 3, col: 2 }],
-  // 4: Параллелограмм (8)
   [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 2, col: 2 }, { row: 2, col: 3 }, { row: 3, col: 2 }, { row: 3, col: 3 }],
-  // 5: Трапеция (11)
   [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 1, col: 3 }, { row: 2, col: 0 }, { row: 2, col: 3 }, { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }],
-  // 6: Пятиугольник (9)
   [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 1, col: 2 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 3, col: 1 }],
-  // 7: Шестиугольник (10)
   [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 1, col: 2 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 3, col: 1 }, { row: 3, col: 2 }]
 ];
 
-// Базовая конфигурация 4x4 (цвета и направления для генерации)
 const ORIGINAL_CONFIG = [
   [{ direction: "left" as Direction, color: "green" }, { direction: "down", color: "green" }, { direction: "right", color: "red" }, { direction: "up", color: "red" }],
   [{ direction: "left", color: "red" }, { direction: "down", color: "red" }, { direction: "down", color: "red" }, { direction: "up", color: "red" }],
@@ -37,18 +28,21 @@ const ORIGINAL_CONFIG = [
 export class GameApp {
   public gridManager: GridManager;
   public currentLevel = 1;
-  public livesUI: LivesUI; // 👈 Сделали публичным, чтобы main мог читать жизни если нужно
-  
+  public livesUI: LivesUI;
+  private particleSystem: ParticleSystem;
+
   private app: PIXI.Application;
   private arrowsContainer: PIXI.Container;
   private dotsContainer: PIXI.Container;
+  private particlesLayer: PIXI.Container;
   private arrows: Arrow[] = [];
+
   
-  // 👈 Обновленный тип: теперь принимает рейтинг (число)
-  private onWin: (rating: number) => void;
+
   private onScoreUpdate: (score: number) => void;
+  private onWin: (rating: number) => void;
   private onGameOver: () => void;
-  
+
   private changeButton: ChangeButtonUI;
   private isChangeModeActive = false;
   private textureSets: { std: TextureSet; orange: TextureSet; blue: TextureSet; green: TextureSet };
@@ -60,7 +54,7 @@ export class GameApp {
     changeButton: ChangeButtonUI,
     livesUI: LivesUI,
     onScoreUpdate: (score: number) => void,
-    onWin: (rating: number) => void, // 👈 Новый тип
+    onWin: (rating: number) => void,
     onGameOver: () => void
   ) {
     this.app = app;
@@ -73,10 +67,22 @@ export class GameApp {
     this.onGameOver = onGameOver;
 
     this.arrowsContainer = new PIXI.Container();
-    this.dotsContainer = new PIXI.Container();
+this.dotsContainer = new PIXI.Container();
+this.particlesLayer = new PIXI.Container();
+
+this.particleSystem = new ParticleSystem(
+  this.particlesLayer,
+  this.app.ticker
+);
+
     const gameContainer = new PIXI.Container();
     gameContainer.addChild(this.dotsContainer);
+    gameContainer.addChild(this.particlesLayer);
     gameContainer.addChild(this.arrowsContainer);
+
+  // частицы отдельным слоем
+  gameContainer.addChild(this.particlesLayer);
+
     this.app.stage.addChild(gameContainer);
 
     this.initGame();
@@ -120,29 +126,136 @@ export class GameApp {
       return;
     }
 
-    if (this.hasObstacle(arrow.row, arrow.col, arrow.direction)) {
+    const delta = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[arrow.direction];
+    const arrowsToClear: Arrow[] = [];
+    let r = arrow.row + delta.y;
+    let c = arrow.col + delta.x;
+    let hitObstacle = false;
+
+    while (r >= 0 && r < this.gridManager.gridSize && c >= 0 && c < this.gridManager.gridSize) {
+      const target = this.arrows.find(a => a.row === r && a.col === c && !a.isFlying && a !== arrow);
+      if (target) {
+        if (target.direction === arrow.direction) {
+          arrowsToClear.push(target);
+        } else {
+          hitObstacle = true;
+          break;
+        }
+      }
+      r += delta.y;
+      c += delta.x;
+    }
+
+    const stepSize = this.gridManager.tileSize + this.gridManager.spacing;
+
+    if (hitObstacle) {
       this.shakeArrow(arrow);
-      const allLost = this.livesUI.loseLife();
-      if (allLost) {
-        setTimeout(() => this.onGameOver(), 300);
+      if (this.livesUI) {
+        const allLost = this.livesUI.loseLife();
+        if (allLost) setTimeout(() => this.onGameOver(), 300);
       }
       return;
     }
 
-    const delta = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[arrow.direction];
+    const flyDistance = arrowsToClear.length > 0 ? arrowsToClear.length * stepSize : stepSize;
     this.createDot(arrow.x, arrow.y, arrow.color);
-    arrow.fly(delta, () => {
-      this.onScoreUpdate(1);
-      this.arrowsContainer.removeChild(arrow);
-      const idx = this.arrows.indexOf(arrow);
-      if (idx !== -1) this.arrows.splice(idx, 1);
+
+    arrow.fly(delta, flyDistance, () => {
+      let pendingRemovals = 1 + arrowsToClear.length;
       
-      if (this.arrows.length === 0) {
-        // 👈 Рассчитываем рейтинг на основе оставшихся жизней
-        const rating = this.livesUI.getRemainingLives(); 
-        setTimeout(() => this.onWin(rating), 100);
-      }
+      const onAllRemoved = () => {
+        pendingRemovals--;
+        if (pendingRemovals === 0) {
+          this.onScoreUpdate(1 + arrowsToClear.length);
+          this.checkWin();
+        }
+      };
+
+      this.animateArrowVanish(arrow, onAllRemoved);
+      arrowsToClear.forEach(target => {
+        this.createDot(target.x, target.y, target.color);
+        this.animateArrowVanish(target, onAllRemoved);
+      });
     });
+  }
+
+  // ✅ Animation with Particles
+  // ✅ Animation with Particles — ИСПОЛЬЗУЕМ TICKER (более стабильно)
+private animateArrowVanish(arrow: Arrow, onComplete: () => void) {
+  arrow.eventMode = "none";
+  arrow.cursor = "default";
+  
+  const duration = 350;
+  const startTime = performance.now();
+  const startScale = arrow.scale.x;
+  const startAlpha = arrow.alpha;
+  const startRotation = arrow.rotation;
+  const baseColor = this.getColorHex(arrow.color);
+
+  const easeOutBack = (t: number): number => {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  };
+
+  const tickHandler = () => {
+  const elapsed = performance.now() - startTime;
+  const progress = Math.min(elapsed / duration, 1);
+  const eased = easeOutBack(progress);
+
+  arrow.scale.set(startScale * (1 - eased));
+  arrow.alpha = startAlpha * (1 - progress);
+  arrow.rotation = startRotation + eased * 0.3;
+
+  if (progress >= 1) {
+    this.app.ticker.remove(tickHandler);
+
+    this.particleSystem.explode(
+      arrow.x,
+      arrow.y,
+      baseColor,
+      1.0
+    );
+
+    arrow.alpha = 0;
+    arrow.scale.set(0);
+
+    this.removeArrow(arrow);
+    onComplete();
+  }
+};
+
+  this.app.ticker.add(tickHandler);
+}
+
+  private getColorHex(color: string): number {
+    const map: Record<string, number> = { 
+      standard: 0xf87171, orange: 0xffa500, blue: 0x3b82f6, green: 0x22c55e, purple: 0x8b5cf6 
+    };
+    return map[color] || 0xffffff;
+  }
+
+  private checkWin() {
+    if (this.arrows.length === 0) {
+      const rating = this.livesUI ? this.livesUI.getRemainingLives() : 3;
+      setTimeout(() => this.onWin(rating), 100);
+    }
+  }
+
+  private removeArrow(arrow: Arrow) {
+    if (arrow.parent) arrow.parent.removeChild(arrow);
+    const idx = this.arrows.indexOf(arrow);
+    if (idx !== -1) this.arrows.splice(idx, 1);
+  }
+
+  private shakeArrow(arrow: Arrow) {
+    const origX = arrow.x;
+    const steps = [5, -5, 5, -5];
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i >= steps.length) { arrow.x = origX; clearInterval(interval); return; }
+      arrow.x = origX + steps[i++];
+    }, 50);
   }
 
   private changeArrowDirection(arrow: Arrow) {
@@ -200,35 +313,22 @@ export class GameApp {
     return newCells;
   }
 
-  private hasObstacle(startRow: number, startCol: number, dir: Direction): boolean {
-    const delta = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[dir];
-    let r = startRow + delta.y, c = startCol + delta.x;
-    while (r >= 0 && r < this.gridManager.gridSize && c >= 0 && c < this.gridManager.gridSize) {
-      if (this.arrows.some(a => a.row === r && a.col === c && !a.isFlying)) return true;
-      r += delta.y; c += delta.x;
-    }
-    return false;
-  }
-
-  private shakeArrow(arrow: Arrow) {
-    const origX = arrow.x;
-    const steps = [5, -5, 5, -5];
-    let i = 0;
-    const interval = setInterval(() => {
-      if (i >= steps.length) { arrow.x = origX; clearInterval(interval); return; }
-      arrow.x = origX + steps[i++];
-    }, 50);
-  }
-
   private createDot(x: number, y: number, color: string) {
-    const colorMap: Record<string, number> = { standard: 0xf87171, orange: 0xffa500, blue: 0x3b82f6, green: 0x22c55e };
-    const dot = new PIXI.Graphics();
-    dot.beginFill(colorMap[color] || 0xffffff);
-    dot.drawCircle(0, 0, 8);
-    dot.endFill();
-    dot.position.set(x, y);
-    this.dotsContainer.addChild(dot);
-  }
+  const colorMap: Record<string, number> = { 
+    standard: 0xf87171, 
+    orange: 0xffa500, 
+    blue: 0x3b82f6, 
+    green: 0x22c55e 
+  };
+  
+  const dot = new PIXI.Graphics();
+  dot.fill(colorMap[color] || 0xffffff);
+  dot.circle(0, 0, 8);
+  dot.fill();
+  
+  dot.position.set(x, y);
+  this.dotsContainer.addChild(dot);
+}
 
   private getTextureSet(color: string) {
     if (color === "orange") return this.textureSets.orange;
@@ -238,31 +338,40 @@ export class GameApp {
   }
 
   public resize(width: number, height: number, gameScale: number) {
-    this.arrowsContainer.scale.set(gameScale);
-    this.dotsContainer.scale.set(gameScale);
-    this.arrowsContainer.position.set(width / 2, height / 2);
-    this.dotsContainer.position.set(width / 2, height / 2);
-  }
+  this.arrowsContainer.scale.set(gameScale);
+  this.dotsContainer.scale.set(gameScale);
+  this.particlesLayer.scale.set(gameScale);
+
+  this.arrowsContainer.position.set(width / 2, height / 2);
+  this.dotsContainer.position.set(width / 2, height / 2);
+  this.particlesLayer.position.set(width / 2, height / 2);
+}
 
   public resetLevel() {
-    this.currentLevel = 1;
-    this.arrowsContainer.removeChildren();
-    this.dotsContainer.removeChildren();
-    this.arrows = [];
-    this.isChangeModeActive = false;
-    this.changeButton.reset();
-    this.livesUI.reset();
-    this.initGame();
-  }
+  this.currentLevel = 1;
+  this.particleSystem?.reset();
+  this.arrowsContainer.removeChildren();
+  this.dotsContainer.removeChildren();
+  this.arrows = [];
+  this.isChangeModeActive = false;
+  this.changeButton.reset();
+  if (this.livesUI) this.livesUI.reset();
+  this.initGame();
+  
+  this.app.ticker.start();   // ← добавь
+}
 
-  public nextLevel() {
-    this.currentLevel++;
-    this.arrowsContainer.removeChildren();
-    this.dotsContainer.removeChildren();
-    this.arrows = [];
-    this.isChangeModeActive = false;
-    this.changeButton.reset();
-    this.livesUI.reset();
-    this.initGame();
-  }
+public nextLevel() {
+  this.currentLevel++;
+  this.particleSystem?.reset();
+  this.arrowsContainer.removeChildren();
+  this.dotsContainer.removeChildren();
+  this.arrows = [];
+  this.isChangeModeActive = false;
+  this.changeButton.reset();
+  if (this.livesUI) this.livesUI.reset();
+  this.initGame();
+  
+  this.app.ticker.start();   // ← добавь
+}
 }

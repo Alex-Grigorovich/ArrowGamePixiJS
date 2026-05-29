@@ -60,16 +60,28 @@ import { ChangeButtonUI } from "./ui/ChangeButtonUI";
     changeButton,
     livesUI,
     (points) => scoreUI.addPoints(points),
-    // 👈 Победа: принимаем рейтинг и передаём его в WinScreen
-    (rating: number) => winScreen.show(rating, () => {
-      game.nextLevel();
-      levelUI.setLevel(game.currentLevel);
-    }),
-    // Проигрыш
-    () => gameOverScreen.show(() => {
-      game.resetLevel();
-      levelUI.setLevel(1);
-    })
+
+    // Победа
+    (rating: number) => {
+      winScreen.show(rating, () => {
+        winScreen.hide();
+        setTimeout(() => {
+          game.nextLevel();
+          levelUI.setLevel(game.currentLevel);
+        }, 80);
+      });
+    },
+
+    // Поражение
+    () => {
+      gameOverScreen.show(() => {
+        gameOverScreen.hide();
+        setTimeout(() => {
+          game.resetLevel();
+          levelUI.setLevel(1);
+        }, 80);
+      });
+    }
   );
 
   // Z-Order
