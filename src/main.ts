@@ -5,7 +5,8 @@ import {
   loadWinAssets,
   loadChangeButtonTexture,
   loadLivesTextures,
-  loadGameOverTextures
+  loadGameOverTextures,
+  loadComboTextures // ✅ ДОБАВЛЕНО
 } from "./assets/loadAssets";
 import { ScoreUI } from "./ui/ScoreUI";
 import { LivesUI } from "./ui/LivesUI";
@@ -15,24 +16,29 @@ import { WinScreen } from "./game/WinScreen";
 import { GameOverScreen } from "./game/GameOverScreen";
 import { ChangeButtonUI } from "./ui/ChangeButtonUI";
 
+console.log("LOAD ASSETS FILE LOADED");
+
 (async () => {
+    console.log("MAIN START");
+
   const app = new Application();
   await app.init({ resizeTo: window, backgroundColor: 0x000000 });
   document.getElementById("pixi-container")!.appendChild(app.canvas);
 
-  // Загрузка всех ассетов
-  const [bgTexture, arrowTextures, winAssets, uiMoneyTexture, changeTexture, livesTextures, gameOverTextures] = await Promise.all([
-    loadBackground(app),
-    loadArrowTextures(app),
-    loadWinAssets(app),
-    Assets.load("/assets/UiMoney.png").catch(() => {
-      const g = new Graphics().beginFill(0x3399ff).drawRoundedRect(0, 0, 120, 50, 25).endFill();
-      return app.renderer.generateTexture(g);
-    }),
-    loadChangeButtonTexture(app),
-    loadLivesTextures(app),
-    loadGameOverTextures(app)
-  ]);
+  // Загрузка всех ассетов (добавлены comboTextures)
+ const [bgTexture, arrowTextures, winAssets, uiMoneyTexture, changeTexture, livesTextures, gameOverTextures, comboTextures] = await Promise.all([
+  loadBackground(app),
+  loadArrowTextures(app),
+  loadWinAssets(app),
+  Assets.load("/assets/UiMoney.png").catch(() => {
+    const g = new Graphics().beginFill(0x3399ff).drawRoundedRect(0, 0, 120, 50, 25).endFill();
+    return app.renderer.generateTexture(g);
+  }),
+  loadChangeButtonTexture(app),
+  loadLivesTextures(app),
+  loadGameOverTextures(app),
+  loadComboTextures(app) // ✅ ДОБАВЛЕНО
+]);
 
   const bgSprite = new Sprite(bgTexture);
   bgSprite.anchor.set(0.5);
@@ -55,34 +61,25 @@ import { ChangeButtonUI } from "./ui/ChangeButtonUI";
   }, -83, 40);
 
   const game = new GameApp(
-    app,
-    arrowTextures,
-    changeButton,
-    livesUI,
-    (points) => scoreUI.addPoints(points),
-
-    // Победа
-    (rating: number) => {
-      winScreen.show(rating, () => {
-        winScreen.hide();
-        setTimeout(() => {
-          game.nextLevel();
-          levelUI.setLevel(game.currentLevel);
-        }, 80);
-      });
-    },
-
-    // Поражение
-    () => {
-      gameOverScreen.show(() => {
-        gameOverScreen.hide();
-        setTimeout(() => {
-          game.resetLevel();
-          levelUI.setLevel(1);
-        }, 80);
-      });
-    }
-  );
+  app,
+  arrowTextures,
+  changeButton,
+  livesUI,
+  (points) => scoreUI.addPoints(points),
+  (rating: number) => {
+    winScreen.show(rating, () => {
+      winScreen.hide();
+      setTimeout(() => { game.nextLevel(); levelUI.setLevel(game.currentLevel); }, 80);
+    });
+  },
+  () => {
+    gameOverScreen.show(() => {
+      gameOverScreen.hide();
+      setTimeout(() => { game.resetLevel(); levelUI.setLevel(1); }, 80);
+    });
+  },
+  comboTextures // ✅ ДОБАВЛЕНО (8-й параметр)
+);
 
   // Z-Order
   app.stage.addChild(scoreUI);
