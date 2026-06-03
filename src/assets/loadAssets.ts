@@ -14,7 +14,7 @@ export async function loadArrowTextures(app: Application): Promise<{
     const bold: Record<Direction, Texture> = {} as any;
     for (const dir of Object.keys(names) as Direction[]) {
       try { normal[dir] = await Assets.load(names[dir]); } catch {
-        const g = new Graphics(); g.beginFill(0x888888).drawCircle(0, 0, 10).endFill();
+        const g = new Graphics(); g.fill({ color: 0x888888 }).circle(0, 0, 10).fill();
         normal[dir] = app.renderer.generateTexture(g);
       }
       try { bold[dir] = await Assets.load(boldNames[dir]); } catch { bold[dir] = normal[dir]; }
@@ -32,36 +32,40 @@ export async function loadArrowTextures(app: Application): Promise<{
     loadSet({ up: "/assets/ArrowUpGreen.png", down: "/assets/ArrowDownGreen.png", left: "/assets/ArrowLeftGreen.png", right: "/assets/ArrowRightGreen.png" },
       { up: "/assets/ArrowUpGreen_Bold.png", down: "/assets/ArrowDownGreen_Bold.png", left: "/assets/ArrowLeftGreen_Bold.png", right: "/assets/ArrowRightGreen_Bold.png" })
   ]);
+
   return { std, orange, blue, green };
 }
 
 export async function loadBackground(app: Application): Promise<Texture> {
   try { return await Assets.load("/assets/background.png"); } catch {
-    const g = new Graphics().beginFill(0x000000).drawRect(0, 0, 100, 100).endFill();
+    const g = new Graphics().fill({ color: 0x000000 }).rect(0, 0, 100, 100).fill();
     return app.renderer.generateTexture(g);
   }
 }
 
 export async function loadWinAssets(app: Application) {
-  const winTexture = await loadDefault(app, "/assets/Win.png", () => { 
-    const g = new Graphics().beginFill(0xffcc00).drawRoundedRect(0,0,400,200,20).endFill(); 
-    return app.renderer.generateTexture(g); 
+  const winTexture = await loadDefault(app, "/assets/Win.png", () => {
+    const g = new Graphics().fill({ color: 0xffcc00 }).roundRect(0, 0, 400, 200, 20).fill();
+    return app.renderer.generateTexture(g);
   });
-  const closeTexture = await loadDefault(app, "/assets/Close.png", () => { 
-    const g = new Graphics().beginFill(0xff0000).drawCircle(0,0,15).endFill(); 
-    return app.renderer.generateTexture(g); 
+
+  const closeTexture = await loadDefault(app, "/assets/Close.png", () => {
+    const g = new Graphics().fill({ color: 0xff0000 }).circle(0, 0, 15).fill();
+    return app.renderer.generateTexture(g);
   });
-  const starTexture = await loadDefault(app, "/assets/Star.png", () => { 
-    const g = new Graphics().beginFill(0xffd700).drawPolygon([0,-30,10,-10,30,-10,15,5,20,25,0,15,-20,25,-15,5,-30,-10,-10,-10]).endFill(); 
-    return app.renderer.generateTexture(g); 
+
+  const starTexture = await loadDefault(app, "/assets/Star.png", () => {
+    const g = new Graphics().fill({ color: 0xffd700 }).poly([0, -30, 10, -10, 30, -10, 15, 5, 20, 25, 0, 15, -20, 25, -15, 5, -30, -10, -10, -10]).fill();
+    return app.renderer.generateTexture(g);
   });
+
   return { winTexture, closeTexture, starTexture };
 }
 
 export async function loadComboAssets(app: Application) {
   const fb = () => {
     const g = new Graphics();
-    g.beginFill(0xffffff).drawRoundedRect(0, 0, 140, 60, 15).endFill();
+    g.fill({ color: 0xffffff }).roundRect(0, 0, 140, 60, 15).fill();
     return app.renderer.generateTexture(g);
   };
 
@@ -72,52 +76,64 @@ export async function loadComboAssets(app: Application) {
   };
 }
 
-// Вспомогательная функция
-async function loadDefault(app: Application, url: string, fb: () => Texture) {
-  try { return await Assets.load(url); } catch { return fb(); }
-}
-
 export async function loadChangeButtonTexture(app: Application): Promise<Texture> {
   try { return await Assets.load("/assets/Change.png"); } catch {
-    const g = new Graphics(); g.beginFill(0x44aa44).drawRoundedRect(0,0,100,50,10).endFill();
+    const g = new Graphics().fill({ color: 0x44aa44 }).roundRect(0, 0, 100, 50, 10).fill();
     return app.renderer.generateTexture(g);
   }
 }
 
 export async function loadLivesTextures(app: Application) {
   const life = await loadDefault(app, "/assets/Life.png", () => {
-    const g = new Graphics(); g.beginFill(0xff4444).drawCircle(0,0,15).endFill();
+    const g = new Graphics().fill({ color: 0xff4444 }).circle(0, 0, 15).fill();
     return app.renderer.generateTexture(g);
   });
+
   const blank = await loadDefault(app, "/assets/Life_Blank.png", () => {
-    const g = new Graphics(); g.beginFill(0x888888).drawCircle(0,0,15).endFill();
+    const g = new Graphics().fill({ color: 0x888888 }).circle(0, 0, 15).fill();
     return app.renderer.generateTexture(g);
   });
+
   return { life, blank };
 }
 
 export async function loadGameOverTextures(app: Application) {
   const lose = await loadDefault(app, "/assets/Lose.png", () => {
-    const g = new Graphics(); g.beginFill(0x333333).drawRoundedRect(0,0,400,300,20).endFill();
+    const g = new Graphics().fill({ color: 0x333333 }).roundRect(0, 0, 400, 300, 20).fill();
     return app.renderer.generateTexture(g);
   });
+
   const repeat = await loadDefault(app, "/assets/Lose_repeat.png", () => {
-    const g = new Graphics(); g.beginFill(0x44aa44).drawRoundedRect(0,0,160,50,10).endFill();
+    const g = new Graphics().fill({ color: 0x44aa44 }).roundRect(0, 0, 160, 50, 10).fill();
     return app.renderer.generateTexture(g);
   });
+
   return { lose, repeat };
 }
-
-
 
 export async function loadComboTextures(app: Application) {
   const createFallback = (color: number) => {
     const g = new Graphics();
-    g.beginFill(color).drawRoundedRect(0, 0, 140, 60, 15).endFill();
+    g.fill({ color }).roundRect(0, 0, 140, 60, 15).fill();
     return app.renderer.generateTexture(g);
   };
-  const blue   = await loadDefault(app, "/assets/Combo_Blue.png",   () => createFallback(0x3b82f6));
-  const green  = await loadDefault(app, "/assets/Combo_Green.png",  () => createFallback(0x22c55e));
+
+  const blue = await loadDefault(app, "/assets/Combo_Blue.png", () => createFallback(0x3b82f6));
+  const green = await loadDefault(app, "/assets/Combo_Green.png", () => createFallback(0x22c55e));
   const yellow = await loadDefault(app, "/assets/Combo_Yellow.png", () => createFallback(0xfacc15));
+
   return { blue, green, yellow };
+}
+
+// ✅ НОВАЯ ФУНКЦИЯ ДЛЯ ЗАГРУЗКИ БОМБЫ
+export async function loadBombTexture(app: Application): Promise<Texture> {
+  try { return await Assets.load("/assets/Bomb.png"); } catch {
+    const g = new Graphics().fill({ color: 0xff0000 }).rect(-50, -25, 100, 50).fill();
+    return app.renderer.generateTexture(g);
+  }
+}
+
+// ✅ Вспомогательная функция (объявлена только ОДИН раз)
+async function loadDefault(app: Application, url: string, fb: () => Texture) {
+  try { return await Assets.load(url); } catch { return fb(); }
 }
