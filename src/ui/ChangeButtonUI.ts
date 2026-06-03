@@ -20,9 +20,9 @@ export class ChangeButtonUI extends Container {
       this.buttonInteractive.anchor.set(0.5);
     } else {
       const g = new Graphics();
-      g.beginFill(0x44aa44);
-      g.drawRoundedRect(-60, -25, 120, 50, 15);
-      g.endFill();
+      g.fill({ color: 0x44aa44 });
+      g.rect(-60, -25, 120, 50, 15);
+      g.fill();
       this.buttonInteractive = g;
     }
 
@@ -51,7 +51,8 @@ export class ChangeButtonUI extends Container {
     this.countText.position.set(this.offsetX, this.offsetY);
     this.addChild(this.countText);
 
-    this.scale.set(2 / 3);
+    // ✅ УБРАНО: this.scale.set(2 / 3);
+    // Теперь масштаб управляется только через main.ts
   }
 
   public useOne(): void {
@@ -67,7 +68,9 @@ export class ChangeButtonUI extends Container {
     }
   }
 
-  public getRemainingUses(): number { return this.remainingUses; }
+  public getRemainingUses(): number {
+    return this.remainingUses;
+  }
 
   public reset(uses: number = 3): void {
     this.remainingUses = uses;

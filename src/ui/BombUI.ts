@@ -11,17 +11,16 @@ export class BombUI extends Container {
     this.remainingUses = initialUses;
     this.onClickCallback = onClick;
 
-    // ✅ Масштаб кнопки. Подбери значение (0.5 - 0.8), чтобы идеально совпадало с Change
-    const BUTTON_SCALE = 0.7;
-
     if (buttonTexture) {
       this.buttonInteractive = new Sprite(buttonTexture);
       this.buttonInteractive.anchor.set(0.5);
-      this.buttonInteractive.scale.set(BUTTON_SCALE); // Применяем масштаб
+      // ✅ УБРАНО: this.buttonInteractive.scale.set(BUTTON_SCALE);
+      // Теперь масштаб управляется только через main.ts
     } else {
-      // Заглушка, если нет текстуры
       const g = new Graphics();
-      g.fill({ color: 0xff0000 }).rect(-50, -25, 100, 50).fill();
+      g.fill({ color: 0xff0000 });
+      g.rect(-50, -25, 100, 50);
+      g.fill();
       this.buttonInteractive = g;
     }
 
@@ -38,15 +37,13 @@ export class BombUI extends Container {
       text: `${this.remainingUses}`,
       style: {
         fontFamily: 'Arial',
-        fontSize: 15,
+        fontSize: 20,
         fill: 0x000000,
         fontWeight: 'bold'
       }
     });
     this.countText.anchor.set(0.5);
-    // ✅ Позиция текста скорректирована под масштаб кнопки (-75 * 0.6 ≈ -45, 55 * 0.6 ≈ 33)
-    this.countText.position.set(-53, 38);
-
+    this.countText.position.set(-76, 55);
     this.addChild(this.countText);
   }
 
@@ -54,7 +51,6 @@ export class BombUI extends Container {
     if (this.remainingUses > 0) {
       this.remainingUses--;
       this.countText.text = `${this.remainingUses}`;
-      // Мигание при использовании
       (this.buttonInteractive as any).tint = 0xcccccc;
       setTimeout(() => { (this.buttonInteractive as any).tint = 0xffffff; }, 150);
     }

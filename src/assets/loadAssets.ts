@@ -137,3 +137,12 @@ export async function loadBombTexture(app: Application): Promise<Texture> {
 async function loadDefault(app: Application, url: string, fb: () => Texture) {
   try { return await Assets.load(url); } catch { return fb(); }
 }
+
+export async function loadSettingsTexture(app: Application): Promise<Texture> {
+  try { return await Assets.load("/assets/Settings.png"); } catch {
+    // Заглушка на случай отсутствия файла
+    const g = new Graphics();
+    g.fill({ color: 0x44aa44 }).circle(0, 0, 25).fill();
+    return app.renderer.generateTexture(g);
+  }
+}
