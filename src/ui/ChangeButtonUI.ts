@@ -5,13 +5,22 @@ export class ChangeButtonUI extends Container {
   private countText: Text;
   private remainingUses: number;
   private onClickCallback: () => void;
+  private onEmptyClickCallback: () => void;
   private offsetX: number;
   private offsetY: number;
 
-  constructor(buttonTexture: Texture, initialUses: number = 3, onClick: () => void, offsetX = -48, offsetY = 12) {
+  constructor(
+    buttonTexture: Texture,
+    initialUses: number = 3,
+    onClick: () => void,
+    offsetX = -48,
+    offsetY = 12,
+    onEmptyClick: () => void = () => {},
+  ) {
     super();
     this.remainingUses = initialUses;
     this.onClickCallback = onClick;
+    this.onEmptyClickCallback = onEmptyClick;
     this.offsetX = offsetX;
     this.offsetY = offsetY;
 
@@ -21,7 +30,7 @@ export class ChangeButtonUI extends Container {
     } else {
       const g = new Graphics();
       g.fill({ color: 0x44aa44 });
-      g.rect(-60, -25, 120, 50, 15);
+      g.roundRect(-60, -25, 120, 50, 15);
       g.fill();
       this.buttonInteractive = g;
     }
@@ -32,8 +41,11 @@ export class ChangeButtonUI extends Container {
       if (this.remainingUses > 0) {
         this.onClickCallback();
       } else {
-        (this.buttonInteractive as any).tint = 0x888888;
-        setTimeout(() => { (this.buttonInteractive as any).tint = 0xffffff; }, 200);
+        this.onEmptyClickCallback();
+        this.buttonInteractive.tint = 0x888888;
+        setTimeout(() => {
+          this.buttonInteractive.tint = 0x666666;
+        }, 200);
       }
     });
     this.addChild(this.buttonInteractive);
@@ -41,11 +53,11 @@ export class ChangeButtonUI extends Container {
     this.countText = new Text({
       text: `${this.remainingUses}`,
       style: {
-        fontFamily: 'Arial',
+        fontFamily: "Arial",
         fontSize: 24,
         fill: 0x000000,
-        fontWeight: 'bold'
-      }
+        fontWeight: "bold",
+      },
     });
     this.countText.anchor.set(0, 0);
     this.countText.position.set(this.offsetX, this.offsetY);
@@ -59,12 +71,13 @@ export class ChangeButtonUI extends Container {
     if (this.remainingUses > 0) {
       this.remainingUses--;
       this.countText.text = `${this.remainingUses}`;
-      (this.buttonInteractive as any).tint = 0xaaffaa;
-      setTimeout(() => { (this.buttonInteractive as any).tint = 0xffffff; }, 150);
+      this.buttonInteractive.tint = 0xaaffaa;
+      setTimeout(() => {
+        this.buttonInteractive.tint = 0xffffff;
+      }, 150);
     }
     if (this.remainingUses === 0) {
-      (this.buttonInteractive as any).tint = 0x666666;
-      this.buttonInteractive.eventMode = "none";
+      this.buttonInteractive.tint = 0x666666;
     }
   }
 
@@ -75,7 +88,19 @@ export class ChangeButtonUI extends Container {
   public reset(uses: number = 3): void {
     this.remainingUses = uses;
     this.countText.text = `${this.remainingUses}`;
-    (this.buttonInteractive as any).tint = 0xffffff;
+    this.buttonInteractive.tint = 0xffffff;
     this.buttonInteractive.eventMode = "static";
+  }
+
+  public addCharge(amount = 1): void {
+    this.remainingUses += Math.max(1, Math.floor(amount));
+    this.countText.text = `${this.remainingUses}`;
+    this.buttonInteractive.tint = 0xffffff;
+    this.buttonInteractive.eventMode = "static";
+  }
+
+  public setInteractive(enabled: boolean): void {
+    this.buttonInteractive.eventMode = enabled ? "static" : "none";
+    this.alpha = enabled ? 1 : 0.65;
   }
 }

@@ -8,16 +8,25 @@ export class GridManager {
   public gameHeight: number;
 
   constructor() {
-    this.gameWidth = this.gridSize * (this.tileSize + this.spacing) - this.spacing;
-    this.gameHeight = this.gridSize * (this.tileSize + this.spacing) - this.spacing;
+    this.gameWidth =
+      this.gridSize * (this.tileSize + this.spacing) - this.spacing;
+    this.gameHeight =
+      this.gridSize * (this.tileSize + this.spacing) - this.spacing;
   }
 
   // 👇 Теперь принимает массив активных ячеек (фигуру) и базовую конфигурацию
   public generateRandomConfig(
     activeCells: { row: number; col: number }[],
-    originalConfig: { direction: Direction; color: string }[][]
+    originalConfig: { direction: Direction; color: string }[][],
   ): CellConfig[] {
-    const cells: CellConfig[] = activeCells.map((c) => ({ ...c }));
+    const cells: CellConfig[] = activeCells.map((c) => {
+      const base = originalConfig[c.row][c.col];
+      return {
+        ...c,
+        direction: base.direction,
+        originalColor: base.color,
+      };
+    });
 
     // Перемешиваем клетки
     for (let i = cells.length - 1; i > 0; i--) {

@@ -7,13 +7,20 @@ export class WinScreen extends Container {
   private closeTexture: Texture;
   private starTexture: Texture;
   private app: Application;
-  
+
   // Массив для хранения ссылок на звезды
   private stars: Sprite[] = [];
+  private starAnimationTimeouts: ReturnType<typeof setTimeout>[] = [];
+  private animationSession = 0;
   // Базовая позиция Y для звезд (как было в коде: 70)
   private readonly BASE_STAR_Y = 70;
 
-  constructor(app: Application, winTexture: Texture, closeTexture: Texture, starTexture: Texture) {
+  constructor(
+    app: Application,
+    winTexture: Texture,
+    closeTexture: Texture,
+    starTexture: Texture,
+  ) {
     super();
     this.app = app;
     this.winTexture = winTexture;
@@ -22,7 +29,11 @@ export class WinScreen extends Container {
     this.visible = false;
   }
 
-  public show(rating: number, onClose: () => void) {
+  public show(rating: number, onClose: () => void, onStarJump?: () => void) {
+    this.clearStarAnimations();
+    this.animationSession++;
+    const session = this.animationSession;
+
     this.visible = true;
     this.removeChildren();
     this.stars = []; // Очищаем массив перед созданием новых
@@ -38,7 +49,10 @@ export class WinScreen extends Container {
     // Главная панель
     this.winSprite = new Sprite(this.winTexture);
     this.winSprite.anchor.set(0.5);
-    this.winSprite.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+    this.winSprite.position.set(
+      this.app.screen.width / 2,
+      this.app.screen.height / 2,
+    );
     this.addChild(this.winSprite);
 
     // Звёзды
@@ -50,7 +64,7 @@ export class WinScreen extends Container {
     for (let i = 0; i < rating; i++) {
       const star = new Sprite(this.starTexture);
       star.anchor.set(0.5);
-      let xPos = -starSpacing + (i * starSpacing);
+      let xPos = -starSpacing + i * starSpacing;
       if (i === 0) xPos += firstStarOffset;
       if (i === 2) xPos += thirdStarOffset;
 
@@ -65,8 +79,8 @@ export class WinScreen extends Container {
     // Кнопка закрытия
     const closeBtn = new Sprite(this.closeTexture);
     closeBtn.anchor.set(0.5);
-    const closeBtnX = (this.winTexture.width / 2) - 160;
-    const closeBtnY = (-this.winTexture.height / 2) + 180;
+    const closeBtnX = this.winTexture.width / 2 - 160;
+    const closeBtnY = -this.winTexture.height / 2 + 180;
     closeBtn.position.set(closeBtnX, closeBtnY); // Исправлен синтаксис (убран пробел)
     closeBtn.eventMode = "static";
     closeBtn.cursor = "pointer";
@@ -79,42 +93,57 @@ export class WinScreen extends Container {
 
     // Анимация появления панели
     const targetScale = Math.min(
-      this.app.screen.width * 0.8 / this.winTexture.width,
-      this.app.screen.height * 0.8 / this.winTexture.height,
-      1.2
+      (this.app.screen.width * 0.8) / this.winTexture.width,
+      (this.app.screen.height * 0.8) / this.winTexture.height,
+      1.2,
     );
     this.winSprite.scale.set(0);
     this.animateScale(this.winSprite, targetScale);
 
     // ✅ Запуск последовательной анимации прыжков звезд
-    this.animateStarsSequentially();
+    this.animateStarsSequentially(session, onStarJump);
+  }
+
+  private clearStarAnimations() {
+    this.starAnimationTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.starAnimationTimeouts = [];
   }
 
   // Метод для запуска прыжков звезд по очереди (слева направо)
-  private animateStarsSequentially() {
+  private animateStarsSequentially(session: number, onStarJump?: () => void) {
     if (this.stars.length === 0) return;
 
     // Первая звезда начинает прыгать через 600мс (после того как окно появилось)
-    let startDelay = 600; 
+    const startDelay = 600;
 
     for (let i = 0; i < this.stars.length; i++) {
       // Каждая следующая звезда прыгает через 350мс после предыдущей
-      const delay = startDelay + (i * 350);
+      const delay = startDelay + i * 350;
 
-      setTimeout(() => {
-        this.jumpStar(this.stars[i]);
+      const timeout = setTimeout(() => {
+        if (session !== this.animationSession) return;
+        const star = this.stars[i];
+        if (star?.parent) {
+          onStarJump?.();
+          this.jumpStar(star);
+        }
       }, delay);
+      this.starAnimationTimeouts.push(timeout);
     }
   }
 
   // Анимация прыжка одной звезды (вверх на 30px и обратно)
   private jumpStar(star: Sprite) {
+    if (!star.parent) return;
+
     const startY = this.BASE_STAR_Y;
     const jumpHeight = 30; // Высота прыжка 30 пикселей
     const duration = 500; // Длительность одного прыжка в мс
     const startTime = performance.now();
 
     const animate = (now: number) => {
+      if (!star.parent) return;
+
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
@@ -127,9 +156,9 @@ export class WinScreen extends Container {
 
       if (progress < 1) {
         requestAnimationFrame(animate);
-      } else {
+      } else if (star.parent) {
         // Возвращаем точно на базу в конце анимации
-        star.position.y = startY; 
+        star.position.y = startY;
       }
     };
     requestAnimationFrame(animate);
@@ -149,6 +178,8 @@ export class WinScreen extends Container {
   }
 
   public hide() {
+    this.clearStarAnimations();
+    this.animationSession++;
     this.visible = false;
     this.removeChildren();
     this.dimBg = null;
@@ -164,7 +195,10 @@ export class WinScreen extends Container {
       this.dimBg.fill();
     }
     if (this.winSprite) {
-      this.winSprite.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+      this.winSprite.position.set(
+        this.app.screen.width / 2,
+        this.app.screen.height / 2,
+      );
     }
   }
 }

@@ -7,7 +7,7 @@ export class Arrow extends Sprite {
   public row: number;
   public col: number;
   public isFlying = false;
-
+  public isRemoving = false;
   private normalTex: Sprite["texture"];
   private boldTex: Sprite["texture"];
   private baseScaleNormal: number;
@@ -22,7 +22,7 @@ export class Arrow extends Sprite {
     col: number,
     x: number,
     y: number,
-    baseWidth: number
+    baseWidth: number,
   ) {
     super(normalTex);
     this.normalTex = normalTex;
@@ -31,7 +31,6 @@ export class Arrow extends Sprite {
     this.color = color;
     this.row = row;
     this.col = col;
-
     this.anchor.set(0.5);
     this.position.set(x, y);
     this.eventMode = "static";
@@ -46,12 +45,12 @@ export class Arrow extends Sprite {
 
   private setupEvents() {
     this.on("pointerover", () => {
-      if (this.isFlying) return;
+      if (this.isFlying || this.isRemoving) return;
       this.texture = this.boldTex;
       this.scale.set(this.baseScaleBold * 1.2);
     });
     this.on("pointerleave", () => {
-      if (this.isFlying) return;
+      if (this.isFlying || this.isRemoving) return;
       this.texture = this.normalTex;
       this.scale.set(this.baseScaleNormal);
     });
@@ -60,7 +59,7 @@ export class Arrow extends Sprite {
   public setDirection(
     newDirection: Direction,
     newNormalTex: Sprite["texture"],
-    newBoldTex: Sprite["texture"]
+    newBoldTex: Sprite["texture"],
   ) {
     this.direction = newDirection;
     this.normalTex = newNormalTex;
@@ -71,16 +70,53 @@ export class Arrow extends Sprite {
     }
   }
 
-  // 🔽 Метод принимает дистанцию полёта
-  public fly(delta: { x: number; y: number }, distance: number, onComplete: () => void) {
+  // Перемещение стрелки на свободную клетку (без исчезновения).
+  public slide(
+    delta: { x: number; y: number },
+    distance: number,
+    onComplete: () => void,
+    duration = 400,
+  ) {
     this.isFlying = true;
     this.texture = this.boldTex;
     this.scale.set(this.baseScaleBold);
-
     const startX = this.x;
     const startY = this.y;
     const startTime = performance.now();
-    const duration = 400;
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      this.x = startX + delta.x * distance * ease;
+      this.y = startY + delta.y * distance * ease;
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        this.isFlying = false;
+        this.texture = this.normalTex;
+        this.scale.set(this.baseScaleNormal);
+        onComplete();
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  // Метод принимает дистанцию и длительность полёта
+  public fly(
+    delta: { x: number; y: number },
+    distance: number,
+    onComplete: () => void,
+    duration = 400,
+  ) {
+    this.isFlying = true;
+    this.texture = this.boldTex;
+    this.scale.set(this.baseScaleBold);
+    const startX = this.x;
+    const startY = this.y;
+    const startTime = performance.now();
 
     const animate = (now: number) => {
       const elapsed = now - startTime;
@@ -94,6 +130,9 @@ export class Arrow extends Sprite {
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
+        // ✅ Сбрасываем isFlying перед вызовом onComplete
+        this.isFlying = false;
+        this.alpha = 1; // Возвращаем прозрачность
         onComplete();
       }
     };

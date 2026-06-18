@@ -5,11 +5,18 @@ export class BombUI extends Container {
   private countText: Text;
   private remainingUses: number;
   private onClickCallback: () => void;
+  private onEmptyClickCallback: () => void;
 
-  constructor(buttonTexture: Texture, initialUses: number = 2, onClick: () => void) {
+  constructor(
+    buttonTexture: Texture,
+    initialUses: number = 2,
+    onClick: () => void,
+    onEmptyClick: () => void = () => {},
+  ) {
     super();
     this.remainingUses = initialUses;
     this.onClickCallback = onClick;
+    this.onEmptyClickCallback = onEmptyClick;
 
     if (buttonTexture) {
       this.buttonInteractive = new Sprite(buttonTexture);
@@ -29,6 +36,12 @@ export class BombUI extends Container {
     this.buttonInteractive.on("pointerdown", () => {
       if (this.remainingUses > 0) {
         this.onClickCallback();
+      } else {
+        this.onEmptyClickCallback();
+        this.buttonInteractive.tint = 0x666666;
+        setTimeout(() => {
+          this.buttonInteractive.tint = 0x888888;
+        }, 200);
       }
     });
     this.addChild(this.buttonInteractive);
@@ -36,11 +49,11 @@ export class BombUI extends Container {
     this.countText = new Text({
       text: `${this.remainingUses}`,
       style: {
-        fontFamily: 'Arial',
+        fontFamily: "Arial",
         fontSize: 20,
         fill: 0x000000,
-        fontWeight: 'bold'
-      }
+        fontWeight: "bold",
+      },
     });
     this.countText.anchor.set(0.5);
     this.countText.position.set(-76, 55);
@@ -51,12 +64,13 @@ export class BombUI extends Container {
     if (this.remainingUses > 0) {
       this.remainingUses--;
       this.countText.text = `${this.remainingUses}`;
-      (this.buttonInteractive as any).tint = 0xcccccc;
-      setTimeout(() => { (this.buttonInteractive as any).tint = 0xffffff; }, 150);
+      this.buttonInteractive.tint = 0xcccccc;
+      setTimeout(() => {
+        this.buttonInteractive.tint = 0xffffff;
+      }, 150);
     }
     if (this.remainingUses === 0) {
-      (this.buttonInteractive as any).tint = 0x888888;
-      this.buttonInteractive.eventMode = "none";
+      this.buttonInteractive.tint = 0x888888;
     }
   }
 
@@ -67,7 +81,19 @@ export class BombUI extends Container {
   public reset(uses: number = 2): void {
     this.remainingUses = uses;
     this.countText.text = `${this.remainingUses}`;
-    (this.buttonInteractive as any).tint = 0xffffff;
+    this.buttonInteractive.tint = 0xffffff;
     this.buttonInteractive.eventMode = "static";
+  }
+
+  public addCharge(amount = 1): void {
+    this.remainingUses += Math.max(1, Math.floor(amount));
+    this.countText.text = `${this.remainingUses}`;
+    this.buttonInteractive.tint = 0xffffff;
+    this.buttonInteractive.eventMode = "static";
+  }
+
+  public setInteractive(enabled: boolean): void {
+    this.buttonInteractive.eventMode = enabled ? "static" : "none";
+    this.alpha = enabled ? 1 : 0.65;
   }
 }

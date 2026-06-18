@@ -13,7 +13,7 @@ export class ParticleSystem {
 
   public explode(x: number, y: number, color: number, scale: number = 1) {
     if (!this.active) return;
-    
+
     const count = 40;
     const speed = 3.8;
 
@@ -26,7 +26,7 @@ export class ParticleSystem {
         vx: Math.cos(angle) * vel,
         vy: Math.sin(angle) * vel,
         decay: 0.016 + Math.random() * 0.022,
-        scale: scale
+        scale: scale,
       });
 
       this.container.addChild(particle);
@@ -53,16 +53,16 @@ export class ParticleSystem {
   }
 
   public destroy() {
-  this.clearParticles();
+    this.clearParticles();
 
-  if (this.container.parent) {
-    this.container.parent.removeChild(this.container);
+    if (this.container.parent) {
+      this.container.parent.removeChild(this.container);
+    }
+
+    this.container.destroy({
+      children: true,
+    });
   }
-
-  this.container.destroy({
-    children: true
-  });
-}
 
   private clearParticles() {
     for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -80,10 +80,16 @@ class Particle extends Graphics {
   private vx = 0;
   private vy = 0;
 
-  constructor(x: number, y: number, size: number, color: number, props: any) {
+  constructor(
+    x: number,
+    y: number,
+    size: number,
+    color: number,
+    props: { scale: number; vx: number; vy: number; decay: number },
+  ) {
     super();
     this.fill(color);
-    this.rect(-size/2, -size/2, size, size);
+    this.rect(-size / 2, -size / 2, size, size);
     this.fill();
 
     this.position.set(x, y);

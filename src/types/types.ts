@@ -1,7 +1,9 @@
+import type { Sprite } from "pixi.js";
+
 export type Direction = "up" | "down" | "left" | "right";
 
 export interface ArrowData {
-  sprite: PIXI.Sprite;
+  sprite: Sprite;
   direction: Direction;
   color: string;
   row: number;
